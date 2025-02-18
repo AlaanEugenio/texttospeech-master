@@ -1,6 +1,6 @@
 <?php
 $host = 'localhost';
-$db   = 'cesfam';
+$db   = 'cesfamd';
 $user = 'root';
 $pass = ''; // Cambia si tienes contraseña
 $charset = 'utf8mb4';

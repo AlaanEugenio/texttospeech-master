@@ -1,6 +1,9 @@
 <?php
 session_start();
-
+if (!isset($_SESSION['id_funcionario'])) {
+    header("Location: login.php");
+    exit();
+}
 require 'db.php';
 
 date_default_timezone_set("America/Santiago"); // Zona horaria Santiago, Chile
@@ -46,14 +49,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 
-$sql_obtener = "SELECT nombre_usuario, hora_llamada, nombre_box FROM llamadas";
+// Consulta para obtener los registros de llamadas
+$sql_obtener = "SELECT l.nombre_usuario, l.hora_llamada, l.segunda_llamada, 
+                       b.nombre_box, s.nombre_sector, p.numero AS pisos
+                FROM llamadas l
+                JOIN box b ON l.nombre_box = b.nombre_box
+                JOIN sectores s ON b.id_sector = s.id
+                JOIN pisos p ON s.id = p.id";
 $stmt_obtener = $pdo->prepare($sql_obtener);
 $stmt_obtener->execute();
 $pacientes = $stmt_obtener->fetchAll(PDO::FETCH_ASSOC);
 
 // Obtener datos de sesión
-$nom_func = isset($_SESSION['nom_func']) ? $_SESSION['nom_func'] : "No identificado";
+$nomb_func = isset($_SESSION['nomb_func']) ? $_SESSION['nomb_func'] : "No identificado";
 $nombre_box = isset($_SESSION['nombre_box']) ? $_SESSION['nombre_box'] : "No asignado";
+
+// Obtener el sector y piso del box actual
+$sql_sector_piso = "SELECT s.nombre_sector, p.numero AS pisos
+                    FROM sectores s
+                    JOIN pisos p ON p.id = s.id
+                    JOIN box b ON b.id_sector = s.id
+                    WHERE b.nombre_box = :nombre_box";
+$stmt_sector_piso = $pdo->prepare($sql_sector_piso);
+$stmt_sector_piso->execute([':nombre_box' => $nombre_box]);
+$sector_piso = $stmt_sector_piso->fetch(PDO::FETCH_ASSOC);
+
+$nombre_sector = $sector_piso ? $sector_piso['nombre_sector'] : "No asignado";
+$pisos = $sector_piso ? $sector_piso['pisos'] : "No disponible";
 ?>
 
 <!DOCTYPE html>
@@ -62,18 +84,20 @@ $nombre_box = isset($_SESSION['nombre_box']) ? $_SESSION['nombre_box'] : "No asi
     <meta charset="UTF-8">
     <title>Llamada usuarios</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-6">
 
-<header class="w-full bg-blue-600 text-white py-4 px-6 flex justify-between items-center shadow-md fixed top-0 left-0">
-    <h1 class="text-lg font-semibold">Sistema de llamadas</h1>
+<header class="w-full bg-blue-600 text-white py-4 px-6 flex justify-between items-center shadow-md fixed top-0 py-4 px-6">
+    <h1 class="text-3xl font-semibold">Sistema de llamadas</h1>
     <div class="text-sm">
-        <p><strong>Funcionario:</strong> <?= htmlspecialchars($nom_func) ?></p>
-        <p><strong>Box actual:</strong> <?= htmlspecialchars($nombre_box) ?></p>
+        <p class="text-xl"><strong>Funcionario:</strong> <?= htmlspecialchars($nomb_func) ?></p>
+        <p class="text-xl"><strong>Piso:</strong> <?= htmlspecialchars($pisos) ?><strong>  Sector:</strong> <?= htmlspecialchars($nombre_sector) ?></p>
+        <p class="text-xl"><strong>Box actual:</strong> <?= htmlspecialchars($nombre_box) ?></p>
     </div>
 </header>
 
-<div class="bg-white p-6 rounded-lg shadow-md w-96 mb-6">
+<div class="bg-white p-6 rounded-lg shadow-md w-96 mb-6 my-[100px]">
     <?php if (isset($mensaje)): ?>
         <div class="mb-4 text-center text-green-600 font-semibold">
             <?= htmlspecialchars($mensaje); ?>
@@ -103,7 +127,8 @@ $nombre_box = isset($_SESSION['nombre_box']) ? $_SESSION['nombre_box'] : "No asi
                 <tr>
                     <th class="border border-gray-400 px-4 py-2">Usuario</th>
                     <th class="border border-gray-400 px-4 py-2">Hora llamada</th>
-                    <th class="border border-gray-400 px-4 py-2">Box</th>
+                    <th class="border border-gray-400 px-4 py-2">Hora segunda llamada</th>
+                    <th class="border border-gray-400 px-4 py-2">Ubicación</th>
                     <th class="border border-gray-400 px-4 py-2">Acciones</th>
                 </tr>
             </thead>
@@ -113,10 +138,25 @@ $nombre_box = isset($_SESSION['nombre_box']) ? $_SESSION['nombre_box'] : "No asi
                         <tr class="text-center">
                             <td class="border border-gray-400 px-4 py-2"><?= htmlspecialchars($usuario['nombre_usuario']) ?></td>
                             <td class="border border-gray-400 px-4 py-2"><?= htmlspecialchars($usuario['hora_llamada']) ?></td>
-                            <td class="border border-gray-400 px-4 py-2"><?= htmlspecialchars($usuario['nombre_box']) ?></td>
+                            <td class="border border-gray-400 px-4 py-2"><?= htmlspecialchars($usuario['segunda_llamada']) ?></td>
+                            <td class="border border-gray-400 px-4 py-2">
+                                <strong></strong> <?= htmlspecialchars($usuario['nombre_box']) ?><br>
+                                <strong></strong> <?= htmlspecialchars($usuario['pisos']) ?><br>
+                                <strong></strong> <?= htmlspecialchars($usuario['nombre_sector']) ?>
+                            </td>                            
+                            <td class="border border-gray-400 px-4 py-2 justify-center">
+                                <button class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition" 
+                                    onclick="eliminarUsuario('<?= htmlspecialchars($usuario['nombre_usuario']) ?>', this)">
+                                    <span class="material-symbols-outlined">delete</span>
+                                </button>
+                                <button class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
+                                    onclick="registrarSegundaLlamada('<?= htmlspecialchars($usuario['nombre_usuario']) ?>', this)">
+                                    <span class="material-symbols-outlined">campaign</span>
+                                </button>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
-                <?php else: ?>
+                    <?php else: ?>
                     <tr>
                         <td colspan="4" class="border border-gray-400 px-4 py-2 text-center text-gray-500">No hay registros</td>
                     </tr>
@@ -125,6 +165,44 @@ $nombre_box = isset($_SESSION['nombre_box']) ? $_SESSION['nombre_box'] : "No asi
         </table>
     </div>
 </div>
+<script>
+function eliminarUsuario(nombreUsuario, btn) {
+    let formData = new FormData();
+    formData.append("nombre_usuario", nombreUsuario);
 
+    fetch("eliminar_usuario.php", {
+        method: "POST",
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        if (data.success) {
+            let row = btn.closest("tr"); // Encuentra la fila del usuario
+            row.remove(); // Elimina la fila sin recargar la página
+        }
+    })
+    .catch(error => console.error("Error:", error));
+}
+
+function registrarSegundaLlamada(nombreUsuario, btn) {
+    let formData = new FormData();
+    formData.append("nombre_usuario", nombreUsuario);
+
+    fetch("segunda_llamada.php", {
+        method: "POST",
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        if (data.success) {
+            // Actualizar la interfaz si es necesario
+        }
+    })
+    .catch(error => console.error("Error:", error));
+}
+</script>
 </body>
 </html>
+

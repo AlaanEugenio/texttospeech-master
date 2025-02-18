@@ -1,26 +1,18 @@
 <?php
+session_start();
+if (!isset($_SESSION['id_funcionario'])) {
+    header("Location: login.php");
+    exit();
+}
 require 'db.php';
 
 try {
     // Consulta con JOIN para obtener todos los datos necesarios
-    $sql = "SELECT l.nombre_usuario, b.nombre_box, l.hora_llamada
+    $sql = "SELECT l.nombre_usuario, b.nombre_box, l.hora_llamada, l.segunda_llamada
             FROM llamadas l
-            LEFT JOIN box b ON l.nombre_box = b.nombre_box"; // Ajusta 'box_id' si es diferente
+            LEFT JOIN box b ON l.nombre_box = b.nombre_box";
     $stmt = $pdo->query($sql);
     $llamadas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $voice = new COM("SAPI.SpVoice");
-    $vozTexto = "";
-
-    foreach ($llamadas as $llamada) {
-        $box = $llamada['nombre_box'] ?? "sin asignar";
-        $hora = $llamada['hora_llamada'] ?? "sin hora";
-        $vozTexto .= "El usuario " . $llamada['nombre_usuario'] . " tiene su turno en el box " . $box . " . ";
-    }
-
-    if (!empty($vozTexto)) {
-        $voice->Speak($vozTexto);
-    }
 } catch (PDOException $e) {
     die("Error en la base de datos: " . $e->getMessage());
 } catch (Exception $e) {
@@ -40,10 +32,9 @@ try {
 
     <!-- Encabezado -->
     <header class="bg-blue-600 text-white py-4 px-6 shadow-md flex justify-between items-center">
-    <h1 class="text-2xl font-semibold">Sistema de Llamadas</h1>
-    <span id="reloj" class="text-lg font-medium"></span> <!-- Reloj aquí -->
-</header>
-
+        <h1 class="text-4xl font-semibold">Sistema de Llamadas</h1>
+        <span id="reloj" class="text-4xl font-medium"></span> <!-- Reloj aquí -->
+    </header>
 
     <!-- Contenedor de la tabla -->
     <div class="max-w-4xl mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
@@ -54,8 +45,9 @@ try {
                 <thead class="bg-blue-500 text-white">
                     <tr>
                         <th class="border border-gray-300 px-4 py-2 text-left">Usuario</th>
-                        <th class="border border-gray-300 px-4 py-2 text-left">Box</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Ubicación</th>
                         <th class="border border-gray-300 px-4 py-2 text-left">Hora Llamada</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Segunda llamada</th>
                         <th class="border border-gray-300 px-4 py-2 text-left">Estado</th>
                     </tr>
                 </thead>
@@ -65,15 +57,15 @@ try {
                             <td class="border border-gray-300 px-4 py-2"><?php echo htmlspecialchars($llamada['nombre_usuario']); ?></td>
                             <td class="border border-gray-300 px-4 py-2"><?php echo htmlspecialchars($llamada['nombre_box']); ?></td>
                             <td class="border border-gray-300 px-4 py-2"><?php echo htmlspecialchars($llamada['hora_llamada']); ?></td>
-                            <td class="border border-gray-300 px-4 py-2">
-                                <?php echo isset($llamada['estado']) ? "Llamando" : "Sin llamar"; ?> 
-                            </td>
+                            <td class="border border-gray-300 px-4 py-2"><?php echo htmlspecialchars($llamada['segunda_llamada']); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
     </div>
+    
+    <!-- Actualizar el reloj -->
     <script>
     function actualizarReloj() {
         $.ajax({
@@ -83,10 +75,34 @@ try {
             }
         });
     }
-
     setInterval(actualizarReloj, 1000); // Llamar cada 1 segundo
     actualizarReloj(); // Llamar una vez al cargar la página
-</script>
+    </script>
+    
+    <!-- Obtener y reproducir voz -->
+    <script>
+    function hablarTexto(texto) {
+        const speech = new SpeechSynthesisUtterance(texto);
+        speech.lang = "es-ES"; // Configurar idioma español
+        window.speechSynthesis.speak(speech);
+    }
+    function obtenerVoz() {
+        $.ajax({
+            url: 'voz.php',
+            dataType: 'json',
+            success: function(respuesta) {
+                if (respuesta.texto.trim() !== "") {
+                    hablarTexto(respuesta.texto);
+                }
+            },
+            error: function() {
+                console.error("Error al obtener la voz.");
+            }
+        });
+    }
+    obtenerVoz(); // Llamar al cargar la página
+    setInterval(obtenerVoz, 3000); // Llamar cada 3 segundos
+    </script>
 
 </body>
 </html>

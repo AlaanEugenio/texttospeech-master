@@ -7,11 +7,11 @@ $mensaje = "";
 // Manejar la solicitud AJAX para obtener ubicaciones
 if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['fetch_locations'])) {
     try {
-        $sql = "SELECT box.id, box.nombre_box, pisos.numero AS piso, sectores.nombre AS sector 
+        $sql = "SELECT box.id, box.nombre_box, pisos.numero AS piso, sectores.nombre_sector AS sector 
                 FROM box
                 INNER JOIN pisos ON box.id_piso = pisos.id
                 INNER JOIN sectores ON box.id_sector = sectores.id";
-                
+
         $stmt = $pdo->query($sql);
         $ubicaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -39,14 +39,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $ubicacion_id = $_POST['ubicacion']; // Ubicación seleccionada (id del box)
 
     // Consulta para buscar usuario por RUT
-    $sql = "SELECT id_funcionario, nom_func, rut, clave FROM funcionarios WHERE rut = :rut";
+    $sql = "SELECT id_funcionario, nomb_func, rut, clave FROM funcionarios WHERE rut = :rut";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':rut' => $rut]);
     $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($usuario) {
         if (password_verify($clave, $usuario['clave'])) {
-            $_SESSION['nom_func'] = $usuario['nom_func'];
+            $_SESSION['nomb_func'] = $usuario['nomb_func'];
             $_SESSION['id_funcionario'] = $usuario['id_funcionario'];
             $_SESSION['ubicacion_id'] = $ubicacion_id;
 
@@ -73,6 +73,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>Iniciar Sesión</title>
@@ -80,16 +81,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <script>
-        $(document).ready(function () {
+        $(document).ready(function() {
             // Cargar ubicaciones dinámicamente
-            $.get("login.php?fetch_locations=1", function (data) {
+            $.get("login.php?fetch_locations=1", function(data) {
                 let locations = JSON.parse(data);
                 let select = $("#ubicacion");
 
                 select.empty(); // Limpiar opciones previas
                 select.append('<option value="">Seleccione una ubicación</option>');
 
-                locations.forEach(function (loc) {
+                locations.forEach(function(loc) {
                     select.append(`<option value="${loc.id}">${loc.piso} - ${loc.sector} - ${loc.nombre_box} </option>`);
                 });
             }).fail(function(jqXHR, textStatus, errorThrown) {
@@ -98,8 +99,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         });
     </script>
 </head>
-<body class="bg-[#6693C7] flex items-center justify-center min-h-screen">
+
+<body class="bg-[url('img/bg.JPG')] bg-cover flex items-center justify-center min-h-screen">
     <div class="bg-[#C9CDD5] shadow-xl rounded-2xl p-8 w-full max-w-sm">
+        <div class="flex justify-center mb-4">
+            <img src="img/Logo Cesfam.JPG" alt="logo cesfam" class="h-[120px] rounded-2xl">
+        </div>
         <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Iniciar Sesión</h2>
 
         <?php if (!empty($mensaje)): ?>
@@ -113,13 +118,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div>
                 <label for="rut" class="block text-sm font-medium text-gray-700">Usuario</label>
                 <input type="text" name="rut" id="rut" placeholder="Ingresa tu RUT sin puntos ni verificador" required
-                       class="mt-1 w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    class="mt-1 w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400">
             </div>
 
             <div>
                 <label for="clave" class="block text-sm font-medium text-gray-700">Clave</label>
                 <input type="password" name="clave" id="clave" placeholder="Clave" required
-                       class="mt-1 w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    class="mt-1 w-full px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400">
             </div>
 
             <!-- Menú desplegable de ubicaciones -->
@@ -132,18 +137,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
 
             <button type="submit"
-                    class="w-full bg-[#6693C7] hover:bg-blue-600 text-white font-semibold py-2 rounded-xl transition duration-300">
+                class="w-full bg-[#6693C7] hover:bg-blue-600 text-white font-semibold py-2 rounded-xl transition duration-300">
                 Iniciar Sesión
             </button>
         </form>
 
         <div class="mt-4 text-center">
             <p class="text-gray-600">Registro</p>
-            <a href="registro.php" 
-               class="inline-block mt-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl transition duration-300">
+            <a href="registro.php"
+                class="inline-block mt-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-xl transition duration-300">
                 Registrarse
             </a>
         </div>
     </div>
 </body>
+
 </html>
