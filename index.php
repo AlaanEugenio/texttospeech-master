@@ -1,97 +1,92 @@
 <?php
-
-$host = 'localhost';
-$dbname = 'cesfam';
-$username = 'root';
-$password = '';
+require 'db.php';
 
 try {
-	$pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-	$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // Consulta con JOIN para obtener todos los datos necesarios
+    $sql = "SELECT l.nombre_usuario, b.nombre_box, l.hora_llamada
+            FROM llamadas l
+            LEFT JOIN box b ON l.nombre_box = b.nombre_box"; // Ajusta 'box_id' si es diferente
+    $stmt = $pdo->query($sql);
+    $llamadas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $voice = new COM("SAPI.SpVoice");
+    $vozTexto = "";
+
+    foreach ($llamadas as $llamada) {
+        $box = $llamada['nombre_box'] ?? "sin asignar";
+        $hora = $llamada['hora_llamada'] ?? "sin hora";
+        $vozTexto .= "El usuario " . $llamada['nombre_usuario'] . " tiene su turno en el box " . $box . " . ";
+    }
+
+    if (!empty($vozTexto)) {
+        $voice->Speak($vozTexto);
+    }
 } catch (PDOException $e) {
-	die("Error de conexión: " . $e->getMessage());
+    die("Error en la base de datos: " . $e->getMessage());
+} catch (Exception $e) {
+    die("Error: " . $e->getMessage()); // Captura otros errores
 }
-
-$stmt = $pdo->query("SELECT id, nombre FROM pacientes ORDER BY nombre ASC");
-$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$voice = new COM("SAPI.SpVoice");
-
-// Generar la frase que se convertirá a voz
-$vozTexto = "";
-foreach ($rows as $row) {
-	// Formar un texto con los datos de cada paciente
-	$vozTexto .= "El usuario " . $row['nombre'] . " tiene su turno. ";
-}
-
-// Convertir a voz inmediatamente con los datos extraídos
-if (!empty($vozTexto)) {
-	$voice->Speak($vozTexto);  // Convierte el texto formado a voz
-}
-
 ?>
 
 <!DOCTYPE html>
-<html>
-
+<html lang="es">
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-	<meta name="robots" content="noindex, nofollow">
-	<title>Llamada usuarios</title>
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-
-	<!-- Tailwind CSS CDN -->
-	<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>Registro de Llamadas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
+<body class="bg-gray-100 font-sans antialiased">
 
-<body>
-	<nav class="bg-gray-800 text-white p-4">
-		<div class="flex justify-between items-center">
-			<div id="clock"></div>
-			<div id="date"><?php echo date('l, F j, Y'); ?></div>
-		</div>
-	</nav>
+    <!-- Encabezado -->
+    <header class="bg-blue-600 text-white py-4 px-6 shadow-md flex justify-between items-center">
+    <h1 class="text-2xl font-semibold">Sistema de Llamadas</h1>
+    <span id="reloj" class="text-lg font-medium"></span> <!-- Reloj aquí -->
+</header>
 
-	<div class="max-w-4xl mx-auto p-6">
-		<div class="bg-blue-600 text-white p-4 rounded-md shadow-md">
-			<center>
-				<strong class="text-lg underline">Usuario(a) llamado</strong>
-			</center>
-		</div>
-	</div>
 
-	<br>
-	<!-- Tabla con los campos solicitados y datos de la base de datos -->
-	<div class="max-w-full overflow-x-auto">
-		<table class="min-w-full table-auto border-collapse border border-gray-300">
-			<thead>
-				<tr class="bg-gray-200">
-					<th class="border border-gray-300 px-2 py-1 text-xs">Nombre</th>
-					<th class="border border-gray-300 px-2 py-1 text-xs">Rut</th>
-					<th class="border border-gray-300 px-2 py-1 text-xs">Repetición</th>
-					<th class="border border-gray-300 px-2 py-1 text-xs">Pasillo</th>
-					<th class="border border-gray-300 px-2 py-1 text-xs">Box</th>
-					<th class="border border-gray-300 px-2 py-1 text-xs">Estado</th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php foreach ($rows as $row): ?>
-					<tr>
-						<td class="border border-gray-300 px-2 py-1 text-xs"><?php echo htmlspecialchars($row['nombre']); ?></td>
-						<td class="border border-gray-300 px-2 py-1 text-xs"><?php echo htmlspecialchars($row['id']); ?></td>
-						<td class="border border-gray-300 px-2 py-1 text-xs"><?php echo htmlspecialchars($row['repeticion']); ?></td>
-						<td class="border border-gray-300 px-2 py-1 text-xs"><?php echo htmlspecialchars($row['pasillo']); ?></td>
-						<td class="border border-gray-300 px-2 py-1 text-xs"><?php echo htmlspecialchars($row['box']); ?></td>
-						<td class="border border-gray-300 px-2 py-1 text-xs"><?php echo htmlspecialchars($row['estado']); ?></td>
-					</tr>
-				<?php endforeach; ?>
-			</tbody>
-		</table>
-	</div>
+    <!-- Contenedor de la tabla -->
+    <div class="max-w-4xl mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold mb-4 text-center text-gray-800">Registros de Llamadas</h2>
 
-	<br>
+        <div class="overflow-x-auto">
+            <table class="min-w-full table-auto border-separate border border-gray-300">
+                <thead class="bg-blue-500 text-white">
+                    <tr>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Usuario</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Box</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Hora Llamada</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-800">
+                    <?php foreach ($llamadas as $llamada): ?>
+                        <tr class="hover:bg-gray-100">
+                            <td class="border border-gray-300 px-4 py-2"><?php echo htmlspecialchars($llamada['nombre_usuario']); ?></td>
+                            <td class="border border-gray-300 px-4 py-2"><?php echo htmlspecialchars($llamada['nombre_box']); ?></td>
+                            <td class="border border-gray-300 px-4 py-2"><?php echo htmlspecialchars($llamada['hora_llamada']); ?></td>
+                            <td class="border border-gray-300 px-4 py-2">
+                                <?php echo isset($llamada['estado']) ? "Llamando" : "Sin llamar"; ?> 
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+    function actualizarReloj() {
+        $.ajax({
+            url: 'reloj.php', // Archivo PHP que devuelve la hora
+            success: function(hora) {
+                $('#reloj').text(hora); // Actualiza el span con la hora
+            }
+        });
+    }
 
-	<script src="js/script.js"></script>
+    setInterval(actualizarReloj, 1000); // Llamar cada 1 segundo
+    actualizarReloj(); // Llamar una vez al cargar la página
+</script>
+
 </body>
-
 </html>
